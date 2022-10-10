@@ -29,10 +29,7 @@ namespace quiu.http
 
             var channel = _app.GetChannel (guid);
             if (channel == null)
-            {
-                await SendResponseAsync (response, 404);
-                return;
-            }
+                throw new HttpNotFoundException ();
 
             var data = await channel.FetchAsync (offset);
 
@@ -47,10 +44,7 @@ namespace quiu.http
 
             var channel = _app.GetChannel (guid);
             if (channel == null)
-            {
-                await SendResponseAsync (response, 404);
-                return;
-            }
+                throw new HttpNotFoundException ();
 
             var data = channel.FetchAsync (offset, count);
             var processor = (Data d) => new { timestamp = new DateTime (d.Timestamp).ToString ("u"), payload = Serializer.ToText (d.Value) };
@@ -64,10 +58,7 @@ namespace quiu.http
 
             var channel = _app.GetChannel (guid);
             if (channel == null)
-            {
-                await SendResponseAsync (response, 404);
-                return;
-            }
+                throw new HttpNotFoundException ();
 
             using (var sr = new StreamReader (request.InputStream))
             {

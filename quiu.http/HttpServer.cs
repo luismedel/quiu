@@ -124,7 +124,7 @@ namespace quiu.http
                 return (T) Convert.ChangeType (value, typeof (T));
 
             if (!convertfn.Invoke (value, out T converted))
-                throw new HttpListenerException (420, $"Invalid value for '{key}'");
+                throw new HttpRequiredParamException ($"Invalid value for '{key}'");
 
             return converted;
         }
@@ -132,13 +132,13 @@ namespace quiu.http
         T GetRequiredArgument<T> (string key, string? value, TypeConvertDelegate<T>? convertfn = null)
         {
             if (string.IsNullOrEmpty (value))
-                throw new HttpListenerException (420, $"Missing value for '{key}'");
+                throw new HttpRequiredParamException ($"Missing value for '{key}'");
 
             if (convertfn == null)
                 return (T) Convert.ChangeType (value, typeof (T));
 
             if (!convertfn.Invoke (value, out T converted))
-                throw new HttpListenerException (420, $"Invalid value for '{key}'");
+                throw new HttpRequiredParamException ($"Invalid value for '{key}'");
 
             return converted;
         }
