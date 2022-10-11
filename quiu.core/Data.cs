@@ -1,5 +1,6 @@
 ﻿using System;
-namespace quiu
+
+namespace quiu.core
 {
     public struct Data
     {

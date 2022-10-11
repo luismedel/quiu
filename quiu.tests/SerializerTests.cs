@@ -1,4 +1,6 @@
-﻿namespace quiu.tests;
+﻿using quiu.core;
+
+namespace quiu.tests;
 
 public class SerializerTests
     : IDisposable
@@ -12,9 +14,9 @@ public class SerializerTests
     {
         const string text = "hello, world";
 
-        var data = quiu.Serializer.FromText ($@"{{ ""key"": ""{text}"" }}");
+        var data = Serializer.FromText ($@"{{ ""key"": ""{text}"" }}");
 
-        var json = quiu.Serializer.ToJson (data);
+        var json = Serializer.ToJson (data);
         Assert.Equal (text, json.RootElement.GetProperty ("key").GetString ());
     }
 
@@ -23,8 +25,8 @@ public class SerializerTests
     {
         const string text = "hello, world";
 
-        var data = quiu.Serializer.FromText (text);
-        Assert.Equal (text, quiu.Serializer.ToText (data));
+        var data = Serializer.FromText (text);
+        Assert.Equal (text, Serializer.ToText (data));
     }
 
     public void Dispose ()

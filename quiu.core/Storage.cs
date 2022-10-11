@@ -4,13 +4,13 @@ using System.Data.SQLite;
 using System.Data.Common;
 using System.Linq;
 
-namespace quiu
+namespace quiu.core
 {
     public class Storage : IDisposable
     {
         public string Path => _path;
 
-        public Storage(QuiuContext app, string path)
+        public Storage(Context app, string path)
         {
             _app = app;
             _path = path;
@@ -107,7 +107,7 @@ namespace quiu
         readonly List<SQLiteCommand> _cachedCommands = new List<SQLiteCommand> ();
         readonly SQLiteConnection _conn;
 
-        readonly QuiuContext _app;
+        readonly Context _app;
         readonly string _path;
     }
 }

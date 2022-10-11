@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace quiu
+namespace quiu.core
 {
     public static class Logger
     {

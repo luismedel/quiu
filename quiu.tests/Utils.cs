@@ -1,28 +1,29 @@
 ﻿using System;
 using System.Text.Json;
+using quiu.core;
 
 namespace quiu.tests
 {
     public static class Utils
     {
-        public static QuiuContext InitApp ()
+        public static Context InitApp ()
         {
             var datadir = Path.Combine (Path.GetTempPath (), $"quiu/tests-{DateTime.Now.ToString ("yyyy-MM-dd-hh-mm-ss-ff")}-{Guid.NewGuid().ToString("N")}");
             System.IO.Directory.CreateDirectory (datadir);
 
-            QuiuConfig cfg = new QuiuConfig ();
+            Config cfg = new Config ();
             cfg["data_dir"] = datadir;
 
-            return new QuiuContext (cfg);
+            return new Context (cfg);
         }
 
-        public static void DisposeApp (QuiuContext app)
+        public static void DisposeApp (Context app)
         {
             app.Dispose ();
             System.IO.Directory.Delete (app.Config.Get<string> ("data_dir")!, true);
         }
 
-        public static Channel CreateChannel (QuiuContext app, Guid? guid = null)
+        public static Channel CreateChannel (Context app, Guid? guid = null)
         {
             var chnGuid = guid ?? Guid.NewGuid ();
             return app.AddChannel (chnGuid);

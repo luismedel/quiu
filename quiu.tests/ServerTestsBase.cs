@@ -1,4 +1,6 @@
 ﻿using System.Net;
+
+using quiu.core;
 using quiu.http;
 
 namespace quiu.tests;
@@ -9,7 +11,7 @@ where T: HttpServer
 {
     protected abstract string ServerHost { get; }
 
-    protected QuiuContext App => _app;
+    protected Context App => _app;
     protected T Server => _server;
 
     public ServerTestsBase ()
@@ -53,6 +55,6 @@ where T: HttpServer
 
     protected async Task<string> ContentStringAsync (HttpResponseMessage response) => await response.Content.ReadAsStringAsync ();
 
-    readonly QuiuContext _app;
+    readonly Context _app;
     readonly T _server;
 }

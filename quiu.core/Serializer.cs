@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json;
 
-namespace quiu
+namespace quiu.core
 {
     public static class Serializer
     {

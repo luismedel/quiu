@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\quiu\quiu.csproj" />
     <ProjectReference Include="..\quiu.http\quiu.http.csproj" />
+    <ProjectReference Include="..\quiu.core\quiu.core.csproj" />
   </ItemGroup>
 </Project>

@@ -4,8 +4,8 @@ using System.IO;
 using System.Threading.Channels;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using static quiu.http.QuiuAdminServer;
 using System.Collections.Specialized;
+using quiu.core;
 
 namespace quiu.http
 {

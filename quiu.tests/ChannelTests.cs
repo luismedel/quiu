@@ -1,4 +1,6 @@
-﻿namespace quiu.tests;
+﻿using quiu.core;
+
+namespace quiu.tests;
 
 public class ChannelTests
     : IDisposable
@@ -37,7 +39,7 @@ public class ChannelTests
     [Fact]
     public void Test_Append ()
     {
-        var data = quiu.Serializer.FromText ("hello, world");
+        var data = Serializer.FromText ("hello, world");
 
         var chn = Utils.CreateChannel (_app);
         var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
@@ -57,9 +59,9 @@ public class ChannelTests
         const string text = "hello, world";
 
         var chn = Utils.CreateChannel (_app);
-        chn.Append (quiu.Serializer.FromText (text));
+        chn.Append (Serializer.FromText (text));
         var data = chn.Fetch (1);
-        Assert.Equal (text, quiu.Serializer.ToText (data.Value!));
+        Assert.Equal (text, Serializer.ToText (data.Value!));
     }
 
     [Fact]
@@ -70,22 +72,22 @@ public class ChannelTests
         var chn = Utils.CreateChannel (_app);
 
         for (int i = 0; i < 100; i++)
-            chn.Append (quiu.Serializer.FromText($"{text}-{i+1}"));
+            chn.Append (Serializer.FromText($"{text}-{i+1}"));
 
         var offset = new Random ().Next (1, 89);
         var items = chn.Fetch (offset, 10).ToArray ();
         Assert.Equal (10, items.Length);
 
         for (int i = 0; i < items.Length; i++)
-            Assert.Equal ($"{text}-{offset+i}", quiu.Serializer.ToText (items[i].Value));
+            Assert.Equal ($"{text}-{offset+i}", Serializer.ToText (items[i].Value));
 
         offset = 95;
         items = chn.Fetch (offset, 10).ToArray ();
         Assert.Equal (6, items.Length);
 
         for (int i = 0; i < items.Length; i++)
-            Assert.Equal ($"{text}-{offset + i}", quiu.Serializer.ToText (items[i].Value));
+            Assert.Equal ($"{text}-{offset + i}", Serializer.ToText (items[i].Value));
     }
 
-    readonly QuiuContext _app;
+    readonly Context _app;
 }

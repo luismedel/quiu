@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace quiu
+namespace quiu.core
 {
     public class Channel
         : IDisposable
@@ -12,7 +12,7 @@ namespace quiu
 
         public Storage Storage => _dataStorage;
 
-        public Channel (QuiuContext app, Guid guid)
+        public Channel (Context app, Guid guid)
         {
             this.Guid = guid;
 
@@ -130,6 +130,6 @@ namespace quiu
         int _upsertCommand;
 
         readonly Storage _dataStorage;
-        readonly QuiuContext _app;
+        readonly Context _app;
     }
 }

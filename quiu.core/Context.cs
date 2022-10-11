@@ -2,14 +2,14 @@
 using System.Runtime.Loader;
 using System.Threading.Channels;
 
-namespace quiu
+namespace quiu.core
 {
-    public class QuiuContext: IDisposable
+    public class Context: IDisposable
     {
         //const string DEFAULT_DATADIR = "/var/quiu/";
         const string DEFAULT_DATADIR = "/Users/luis/var/quiu/";
 
-        public QuiuConfig Config => _config;
+        public Config Config => _config;
 
         public string DataDirectory { get; private set; }
 
@@ -17,7 +17,7 @@ namespace quiu
 
         public CancellationToken CancellationToken => _cts.Token;
 
-        public QuiuContext(QuiuConfig config)
+        public Context(Config config)
         {
             _config = config;
             _cts = new CancellationTokenSource ();
@@ -115,7 +115,7 @@ namespace quiu
 
         bool _shuttingDown = false;
 
-        readonly QuiuConfig _config;
+        readonly Config _config;
         readonly CancellationTokenSource _cts;
 
         readonly Dictionary<Guid, Channel> _channels = new Dictionary<Guid, Channel> ();

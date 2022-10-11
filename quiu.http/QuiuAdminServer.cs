@@ -4,13 +4,15 @@ using System.IO;
 using System.Threading.Channels;
 using System.Diagnostics;
 
+using quiu.core;
+
 namespace quiu.http
 {
     public class QuiuAdminServer : HttpServer
     {
         public const int DEFAULT_PORT = 2781;
 
-        public QuiuAdminServer (QuiuContext app)
+        public QuiuAdminServer (Context app)
             : base(app.Config.Get<string> ("admin_server_host")!, app.Config.Get<int>("admin_server_port", DEFAULT_PORT)!)
         {
             _app = app;
@@ -52,6 +54,6 @@ namespace quiu.http
         void LogWarning (string message, params object[] args) => Logger.Warning ($"[QuiuAdminServer] {message}", args);
         void LogError (string message, params object[] args) => Logger.Error ($"[QuiuAdminServer] {message}", args);
 
-        readonly QuiuContext _app;
+        readonly Context _app;
    }
 }

@@ -2,9 +2,9 @@
 using System.Text;
 using System.Text.Json;
 
-namespace quiu
+namespace quiu.core
 {
-    public class QuiuConfig
+    public class Config
     {
         public object? this[string key]
         {
@@ -12,8 +12,8 @@ namespace quiu
             set { if (value == null) _values.Remove (key); else _values[key] = value; }
         }
 
-        public QuiuConfig () => _values = new Dictionary<string, object> (StringComparer.InvariantCultureIgnoreCase);
-        public QuiuConfig (string path) : this () => Load (path);
+        public Config () => _values = new Dictionary<string, object> (StringComparer.InvariantCultureIgnoreCase);
+        public Config (string path) : this () => Load (path);
 
         public T? Get<T> (string key, T? @default = default(T))
         {
