@@ -21,12 +21,10 @@ public class ServerTests
     [Fact]
     public async Task Test_Appemd ()
     {
-        const string text = "hello, world";
-
         var chn = Utils.CreateChannel (App);
         var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
 
-        var resp =  await DoPost ($"/channel/{chn.Guid}", text);
+        var resp =  await DoPost ($"/channel/{chn.Guid}", GetTestInput ());
         Assert.Equal (201, (int) resp.StatusCode);
 
         var json = await ContentStringAsync (resp);
@@ -40,12 +38,10 @@ public class ServerTests
     [Fact]
     public async Task Test_AppendMany ()
     {
-        const string text = "hello, world";
-
         var chn = Utils.CreateChannel (App);
         var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
 
-        var buffer = string.Join ('\n', Enumerable.Range (0, 10).Select (i => text));
+        var buffer = string.Join ('\n', Enumerable.Range (0, 10).Select (i => GetTestInput (i)));
 
         var resp = await DoPost ($"/channel/{chn.Guid}", buffer);
         Assert.Equal (201, (int) resp.StatusCode);
@@ -60,30 +56,26 @@ public class ServerTests
     [Fact]
     public async Task Test_Fetch ()
     {
-        const string text = "hello, world";
-
         var chn = Utils.CreateChannel (App);
 
         // Append 100 test items
-        var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => $"{text}-{i+1}"));
+        var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => GetTestInput (i + 1)));
         await DoPost ($"/channel/{chn.Guid}", buffer);
 
         // Pick a random one
         var offset = new Random ().NextInt64 (100);
         var resp = await DoGet ($"/channel/{chn.Guid}/{offset}");
         Assert.Equal (200, (int) resp.StatusCode);
-        Utils.AssertJsonValue (await ContentStringAsync (resp), "payload", $"{text}-{offset}");
+        Utils.AssertJsonValue (await ContentStringAsync (resp), "payload", GetTestInput (offset));
     }
 
     [Fact]
     public async Task Test_FetchMany ()
     {
-        const string text = "hello, world";
-
         var chn = Utils.CreateChannel (App);
 
         // Append 100 test items
-        var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => $"{text}-{i + 1}"));
+        var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => GetTestInput (i + 1)));
         await DoPost ($"/channel/{chn.Guid}", buffer);
 
         // Pick 10 from a random offset (not near the end)
@@ -94,7 +86,7 @@ public class ServerTests
         Assert.Equal (10, items.Length);
 
         for (int i = 0; i < items.Length; i++)
-            Utils.AssertJsonValue (items[i], "payload", $"{text}-{offset+i}");
+            Utils.AssertJsonValue (items[i], "payload", GetTestInput (offset + i));
 
         // Pick 10 from the end (not enough items)
         offset = 95;
@@ -104,6 +96,8 @@ public class ServerTests
         Assert.Equal (6, items.Length);
 
         for (int i = 0; i < items.Length; i++)
-            Utils.AssertJsonValue (items[i], "payload", $"{text}-{offset + i}");
+            Utils.AssertJsonValue (items[i], "payload", GetTestInput (offset + i));
     }
+
+    static string GetTestInput (Int64 suffix = 0) => $"Input text {suffix}";
 }
