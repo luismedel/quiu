@@ -23,11 +23,10 @@ public class AdminServerTests
         var resp = await this.DoPost ("/channel/new", string.Empty);
         Assert.Equal (201, (int) resp.StatusCode);
 
-
         var doc = JsonDocument.Parse (await this.ContentStringAsync (resp));
         var prop = doc.GetPropertyBySelector ("guid");
         Assert.NotNull (prop);
-        Assert.NotEmpty (prop!.Value.GetString ());
+        Assert.False (String.IsNullOrEmpty(prop!.Value.GetString ()));
 
         var guid = Guid.Parse (prop!.Value.GetString ()!);
         Assert.NotNull (App.GetChannel (guid));
