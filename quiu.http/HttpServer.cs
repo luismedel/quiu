@@ -192,7 +192,7 @@ namespace quiu.http
         protected async Task SendResponseAsync (HttpListenerResponse response, int statusCode, string? content = null)
         {
             response.StatusCode = statusCode;
-            if (content != null)
+            if (!string.IsNullOrEmpty (content))
             {
                 using (var sw = new StreamWriter (response.OutputStream))
                 {
@@ -214,10 +214,10 @@ namespace quiu.http
             }
         }
 
-        protected async Task SendJsonResponseAsync (HttpListenerResponse response, int statusCode, object data)
+        protected async Task SendJsonResponseAsync (HttpListenerResponse response, int statusCode, object? data)
         {
             response.Headers.Add (HttpResponseHeader.ContentType, "application/json");
-            await SendResponseAsync (response, statusCode, System.Text.Json.JsonSerializer.Serialize (data));
+            await SendResponseAsync (response, statusCode, data != null ? System.Text.Json.JsonSerializer.Serialize (data) : string.Empty);
         }
 
         protected async Task SendJsonResponseAsync<T> (HttpListenerResponse response, int statusCode, IAsyncEnumerable<T> data, Func<T, object> selector)

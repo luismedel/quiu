@@ -27,7 +27,7 @@ where T: HttpServer
         Utils.DisposeApp (_app);
     }
 
-    protected async Task<HttpResponseMessage> Get (string path)
+    protected async Task<HttpResponseMessage> DoGet (string path)
     {
         var url = $"{this.ServerHost}{path}";
 
@@ -35,12 +35,20 @@ where T: HttpServer
             return await client.GetAsync (url);
     }
 
-    protected async Task<HttpResponseMessage> Post (string path, string data)
+    protected async Task<HttpResponseMessage> DoPost (string path, string data)
     {
         var url = $"{this.ServerHost}{path}";
 
         using (var client = new HttpClient ())
            return await client.PostAsync (url, new StringContent (data, System.Text.Encoding.UTF8));
+    }
+
+    protected async Task<HttpResponseMessage> DoDelete (string path)
+    {
+        var url = $"{this.ServerHost}{path}";
+
+        using (var client = new HttpClient ())
+            return await client.DeleteAsync (url);
     }
 
     protected async Task<string> ContentStringAsync (HttpResponseMessage response) => await response.Content.ReadAsStringAsync ();

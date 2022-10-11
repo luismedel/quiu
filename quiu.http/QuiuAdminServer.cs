@@ -18,12 +18,27 @@ namespace quiu.http
             _app.Shutdown += AppShutdown;
 
             RegisterRoute ("POST", "/channel/new", CreateChannel);
+            RegisterRoute ("DELETE", "/channel/%guid", DropChannel);
         }
 
         async void CreateChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var channel = _app.AddChannel ();
             await SendJsonResponseAsync (response, 201, new { guid = channel.Guid });
+        }
+
+        async void DropChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        {
+            var guid = this.GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
+            var prune = this.GetQueryArgument<bool> (request.QueryString, "prune", false, bool.TryParse);
+
+            var channel = _app.GetChannel (guid);
+            if (channel == null)
+                throw new HttpNotFoundException ();
+
+            _app.DropChannel (channel, pruneData: prune);
+
+            await SendJsonResponseAsync (response, 200, string.Empty);
         }
 
         private void AppShutdown (object? sender, EventArgs e)

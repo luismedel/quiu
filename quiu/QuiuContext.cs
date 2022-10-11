@@ -48,7 +48,10 @@ namespace quiu
             Logger.Info ("Done.");
         }
 
-        void OnAssemblyUnloading (AssemblyLoadContext obj) => OnShutdown ();
+        void OnAssemblyUnloading (AssemblyLoadContext obj)
+        {
+            OnShutdown ();
+        }
 
         public string GetFullPath (string relativePath) => Path.GetFullPath (Path.Combine (DataDirectory, relativePath));
 

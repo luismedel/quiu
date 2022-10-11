@@ -26,7 +26,7 @@ public class ServerTests
         var chn = Utils.CreateChannel (App);
         var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
 
-        var resp =  await Post ($"/channel/{chn.Guid}", text);
+        var resp =  await DoPost ($"/channel/{chn.Guid}", text);
         Assert.Equal (201, (int) resp.StatusCode);
 
         var json = await ContentStringAsync (resp);
@@ -47,7 +47,7 @@ public class ServerTests
 
         var buffer = string.Join ('\n', Enumerable.Range (0, 10).Select (i => text));
 
-        var resp = await Post ($"/channel/{chn.Guid}", buffer);
+        var resp = await DoPost ($"/channel/{chn.Guid}", buffer);
         Assert.Equal (201, (int) resp.StatusCode);
         var json = await ContentStringAsync (resp);
         Utils.AssertJsonValue (json, "processed", 10);
@@ -66,11 +66,11 @@ public class ServerTests
 
         // Append 100 test items
         var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => $"{text}-{i+1}"));
-        await Post ($"/channel/{chn.Guid}", buffer);
+        await DoPost ($"/channel/{chn.Guid}", buffer);
 
         // Pick a random one
         var offset = new Random ().NextInt64 (100);
-        var resp = await Get ($"/channel/{chn.Guid}/{offset}");
+        var resp = await DoGet ($"/channel/{chn.Guid}/{offset}");
         Assert.Equal (200, (int) resp.StatusCode);
         Utils.AssertJsonValue (await ContentStringAsync (resp), "payload", $"{text}-{offset}");
     }
@@ -84,11 +84,11 @@ public class ServerTests
 
         // Append 100 test items
         var buffer = string.Join ('\n', Enumerable.Range (0, 100).Select (i => $"{text}-{i + 1}"));
-        await Post ($"/channel/{chn.Guid}", buffer);
+        await DoPost ($"/channel/{chn.Guid}", buffer);
 
         // Pick 10 from a random offset (not near the end)
         var offset = new Random ().Next (1, 89);
-        var resp = await Get ($"/channel/{chn.Guid}/{offset}/10");
+        var resp = await DoGet ($"/channel/{chn.Guid}/{offset}/10");
         Assert.Equal (200, (int) resp.StatusCode);
         var items = (await ContentStringAsync (resp)).Split ('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal (10, items.Length);
@@ -98,7 +98,7 @@ public class ServerTests
 
         // Pick 10 from the end (not enough items)
         offset = 95;
-        resp = await Get ($"/channel/{chn.Guid}/{offset}/10");
+        resp = await DoGet ($"/channel/{chn.Guid}/{offset}/10");
         Assert.Equal (200, (int) resp.StatusCode);
         items = (await ContentStringAsync (resp)).Split ('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal (6, items.Length);

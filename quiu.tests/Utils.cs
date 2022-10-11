@@ -9,7 +9,6 @@ namespace quiu.tests
         {
             var datadir = Path.Combine (Path.GetTempPath (), $"quiu/tests-{DateTime.Now.ToString ("yyyy-MM-dd-hh-mm-ss-ff")}-{Guid.NewGuid().ToString("N")}");
             System.IO.Directory.CreateDirectory (datadir);
-            Assert.True (System.IO.Directory.Exists (datadir));
 
             QuiuConfig cfg = new QuiuConfig ();
             cfg["data_dir"] = datadir;
@@ -20,8 +19,6 @@ namespace quiu.tests
         public static void DisposeApp (QuiuContext app)
         {
             app.Dispose ();
-
-            Assert.True (System.IO.Directory.Exists (app.Config.Get<string> ("data_dir")));
             System.IO.Directory.Delete (app.Config.Get<string> ("data_dir")!, true);
         }
 
