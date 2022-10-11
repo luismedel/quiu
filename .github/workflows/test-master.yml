@@ -1,4 +1,4 @@
-name: .NET
+name: test-master
 
 on:
   push:
