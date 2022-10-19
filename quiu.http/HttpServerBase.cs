@@ -6,10 +6,11 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Collections.Specialized;
 using quiu.core;
+using YamlDotNet.Core.Tokens;
 
 namespace quiu.http
 {
-    public abstract class HttpServer : IDisposable
+    public abstract class HttpServerBase : IDisposable
     {
         struct Route
         {
@@ -25,55 +26,109 @@ namespace quiu.http
             public Action<Dictionary<string, string>, HttpListenerRequest, HttpListenerResponse> Handler;
         }
 
+        protected Context App => _app;
+        protected CancellationToken CancellationToken => _cts.Token;
+
         protected delegate bool TypeConvertDelegate<T> (ReadOnlySpan<char> input, out T output);
 
         public string Endpoint { get; private set; }
-        public bool IsRunning => _listener.IsListening;
+        public bool IsRunning => _running;
 
-        public HttpServer (string host, int port)
+        public HttpServerBase (Context app, string host, int port, CancellationToken cancellationToken)
         {
             this.Endpoint = $"http://{host}:{port}/";
 
+            _app = app;
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
             _listener = new HttpListener ();
             _listener.Prefixes.Add (this.Endpoint);
+
+            _className = this.GetType ().Name;
         }
 
-        public virtual void Start ()
+        public Task? RunLoop ()
         {
+            if (_running)
+                return null;
+
+            _running = true;
+
+            LogInfo ("Starting server...");
             _listener.Start ();
 
-            RegisterTask (ServerLoop ());
+            LogInfo ($" - Listening on {this.Endpoint}");
+
+            return InnerLoop ();
         }
 
         public virtual void Stop ()
         {
+            if (!_running)
+                return;
+
+            _running = false;
+
+            LogInfo ("Stopping server...");
             _listener.Stop ();
+
+            if (_cts.IsCancellationRequested)
+            {
+                LogInfo ("Cancelling pending operations...");
+                _cts.Cancel ();
+            }
+
+            LogInfo ("Cleaning up watchdog task...");
+            _watchdogCts?.Cancel ();
+            _watchdogCts?.Dispose ();
+            _watchdogTask?.Dispose ();
         }
 
-        async Task ServerLoop ()
+        async Task InnerLoop ()
         {
-            while (_listener.IsListening)
+            // GetContextAsync does not allows cancellation.
+            // We need to mimic it using a cancellable task to act as
+            // a watchdog for external cancellation.
+            _watchdogCts = CancellationTokenSource.CreateLinkedTokenSource (_cts.Token);
+            _watchdogTask = Task.Delay (Timeout.Infinite, _watchdogCts.Token);
+
+            try
             {
-                try
+                while (_running && !_cts.IsCancellationRequested)
                 {
-                    var ctx = await _listener.GetContextAsync ();
-                    await HandleClient (ctx.Request, ctx.Response);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine (ex.Message);
+                    try
+                    {
+                        var listenerTask = _listener.GetContextAsync ();
+
+                        var completedTask = await Task.WhenAny (listenerTask, _watchdogTask);
+                        if (completedTask == _watchdogTask)
+                        {
+                            LogDebug ("Watchdog task cancelled.");
+                            break;
+                        }
+
+                        var ctx = listenerTask.Result;
+                        LogTrace ($"Handling connection from {ctx.Request.RemoteEndPoint}...");
+                        await HandleClientAsync (ctx);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError (ex.Message);
+                    }
                 }
             }
-        }
-
-        void RegisterTask (Task task)
-        {
-            lock (_runningTasks)
+            catch (OperationCanceledException)
             {
-                if (_runningTasks.Count == _runningTasks.Capacity)
-                    _runningTasks.RemoveAll (t => t.IsCompleted || t.IsCompletedSuccessfully || t.IsCanceled || t.IsFaulted);
-
-                _runningTasks.Add (task);
+                LogInfo ("External cancellation detected");
+            }
+            catch (Exception ex)
+            {
+                LogError (ex.Message);
+                throw;
+            }
+            finally
+            {
+                Stop ();
             }
         }
 
@@ -165,40 +220,41 @@ namespace quiu.http
             return GetRequiredArgument<T> (key, args[key], convertfn);
         }
 
-        async Task HandleClient (HttpListenerRequest request, HttpListenerResponse response)
+        async Task HandleClientAsync (HttpListenerContext ctx)
         {
             try
             {
-                var tmp = GetRoute (request.HttpMethod, request.Url);
+                var tmp = GetRoute (ctx.Request.HttpMethod, ctx.Request.Url);
                 if (tmp == null)
                 {
-                    await SendResponseAsync (response, 404);
+                    LogTrace ($"No registered route found for {ctx.Request.Url}");
+
+                    await SendResponseAsync (ctx.Response, 404);
                     return;
                 }
 
                 var match = tmp.Value;
-                await Task.Run (() => match.Handler.Invoke (match.Arguments, request, response));
+                await Task.Run (() => match.Handler.Invoke (match.Arguments, ctx.Request, ctx.Response));
             }
             catch (HttpListenerException ex)
             {
-                await SendJsonResponseAsync (response, ex.ErrorCode, new { error = true, message = ex.Message });
+                await SendJsonResponseAsync (ctx.Response, ex.ErrorCode, new { error = true, message = ex.Message });
             }
             catch (Exception ex)
             {
-                await SendJsonResponseAsync (response, 500, new { error = true, message = ex.Message });
+                await SendJsonResponseAsync (ctx.Response, 500, new { error = true, message = ex.Message });
             }
         }
 
         protected async Task SendResponseAsync (HttpListenerResponse response, int statusCode, string? content = null)
         {
+            LogTrace ($" -> {statusCode}: {content}");
+
             response.StatusCode = statusCode;
-            if (!string.IsNullOrEmpty (content))
+            using (var sw = new StreamWriter (response.OutputStream))
             {
-                using (var sw = new StreamWriter (response.OutputStream))
-                {
-                    sw.AutoFlush = true;
-                    await sw.WriteAsync (content);
-                }
+                sw.AutoFlush = true;
+                await sw.WriteAsync ((content ?? String.Empty).ToCharArray (), this.CancellationToken);
             }
         }
 
@@ -208,8 +264,8 @@ namespace quiu.http
             using (var sw = new StreamWriter (response.OutputStream))
             {
                 sw.AutoFlush = false;
-                foreach (var s in data)
-                    await sw.WriteAsync (s);
+                foreach (var line in data)
+                    await sw.WriteAsync (line.ToCharArray (), this.CancellationToken);
                 sw.Flush ();
             }
         }
@@ -229,24 +285,33 @@ namespace quiu.http
             {
                 sw.AutoFlush = true;
                 await foreach (var d in data)
-                    await sw.WriteLineAsync (System.Text.Json.JsonSerializer.Serialize(selector(d)));
+                {
+                    var line = System.Text.Json.JsonSerializer.Serialize (selector (d));
+                    await sw.WriteLineAsync (line.ToCharArray (), this.CancellationToken);
+                }
             }
         }
 
-        public virtual void Dispose ()
-        {
-            Stop ();
-        }
+        public virtual void Dispose () => this.Stop ();
 
         [Conditional ("DEBUG")]
-        void LogDebug (string message, params object[] args) => Logger.Debug ($"[HttpServer] {message}", args);
-        void LogInfo (string message, params object[] args) => Logger.Info ($"[HttpServer] {message}", args);
-        void LogWarning (string message, params object[] args) => Logger.Warning ($"[HttpServer] {message}", args);
-        void LogError (string message, params object[] args) => Logger.Error ($"[HttpServer] {message}", args);
+        protected void LogDebug (string message, params object[] args) => Logger.Debug ($"[{_className}] {message}", args);
+        [Conditional ("TRACE")]
+        protected void LogTrace (string message, params object[] args) => Logger.Trace ($"[{_className}] {message}", args);
+        protected void LogInfo (string message, params object[] args) => Logger.Info ($"[{_className}] {message}", args);
+        protected void LogWarning (string message, params object[] args) => Logger.Warning ($"[{_className}] {message}", args);
+        protected void LogError (string message, params object[] args) => Logger.Error ($"[{_className}] {message}", args);
 
+        bool _running;
+
+        CancellationTokenSource? _watchdogCts;
+        Task? _watchdogTask;
+
+        readonly Context _app;
+        readonly CancellationTokenSource _cts;
+        readonly HttpListener _listener;
         readonly List<Route> _routes = new List<Route> ();
 
-        readonly List<Task> _runningTasks = new List<Task> ();
-        readonly HttpListener _listener;
+        readonly string _className;
     }
 }

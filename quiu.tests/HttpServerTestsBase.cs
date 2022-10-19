@@ -5,23 +5,41 @@ using quiu.http;
 
 namespace quiu.tests;
 
-public abstract class ServerTestsBase<T>
+public abstract class HttpServerTestsBase<T>
     : IDisposable
-where T: HttpServer
+where T: HttpServerBase
 {
-    protected abstract string ServerHost { get; }
+    protected int ServerPort { get; private set; }
+    protected string ServerHost => "localhost";
+    protected string ServerRoot => $"http://{ServerHost}:{ServerPort}";
 
     protected Context App => _app;
     protected T Server => _server;
 
-    public ServerTestsBase ()
+    public HttpServerTestsBase ()
     {
-        _app = Utils.InitApp ();
+        ServerPort = new Random ().Next (16536, 32768);
+
+        Config config = InitConfig ();
+        _app = Utils.InitApp (initialConfig:config);
+
+        _app.Config["server_host"] = ServerHost;
+        _app.Config["server_port"] = ServerPort;
         _server = InitServer ();
 
-        _server.Start ();
+        _server.RunLoop ();
     }
 
+    /// <summary>
+    /// Inits the config used by the test context.
+    /// </summary>
+    /// <returns></returns>
+    protected abstract Config InitConfig ();
+
+    /// <summary>
+    /// Inits the server instance.
+    /// </summary>
+    /// <returns></returns>
     protected abstract T InitServer ();
 
     public void Dispose ()
@@ -31,7 +49,7 @@ where T: HttpServer
 
     protected async Task<HttpResponseMessage> DoGet (string path)
     {
-        var url = $"{this.ServerHost}{path}";
+        var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
             return await client.GetAsync (url);
@@ -39,7 +57,7 @@ where T: HttpServer
 
     protected async Task<HttpResponseMessage> DoPost (string path, string data)
     {
-        var url = $"{this.ServerHost}{path}";
+        var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
            return await client.PostAsync (url, new StringContent (data, System.Text.Encoding.UTF8));
@@ -47,7 +65,7 @@ where T: HttpServer
 
     protected async Task<HttpResponseMessage> DoDelete (string path)
     {
-        var url = $"{this.ServerHost}{path}";
+        var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
             return await client.DeleteAsync (url);

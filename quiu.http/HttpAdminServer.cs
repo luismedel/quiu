@@ -8,24 +8,29 @@ using quiu.core;
 
 namespace quiu.http
 {
-    public class QuiuAdminServer : HttpServer
+    public class HttpAdminServer : HttpServerBase
     {
+        public const string DEFAULT_HOST = "localhost";
         public const int DEFAULT_PORT = 2781;
 
-        public QuiuAdminServer (Context app)
-            : base(app.Config.Get<string> ("admin_server_host")!, app.Config.Get<int>("admin_server_port", DEFAULT_PORT)!)
+        public HttpAdminServer (Context app, string host, int port, CancellationToken cancellationToken)
+            : base (app, host, port, cancellationToken)
         {
-            _app = app;
-
-            _app.Shutdown += AppShutdown;
-
             RegisterRoute ("POST", "/channel/new", CreateChannel);
             RegisterRoute ("DELETE", "/channel/%guid", DropChannel);
         }
 
+        public HttpAdminServer (Context app)
+            : this (app,
+                    app.Config.Get<string> ("admin_server_host", "localhost")!,
+                    app.Config.Get<int>("admin_server_port", DEFAULT_PORT)!,
+                    app.CancellationToken)
+        {
+        }
+
         async void CreateChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
-            var channel = _app.AddChannel ();
+            var channel = App.AddChannel ();
             await SendJsonResponseAsync (response, 201, new { guid = channel.Guid });
         }
 
@@ -34,26 +39,13 @@ namespace quiu.http
             var guid = this.GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
             var prune = this.GetQueryArgument<bool> (request.QueryString, "prune", false, bool.TryParse);
 
-            var channel = _app.GetChannel (guid);
+            var channel = App.GetChannel (guid);
             if (channel == null)
                 throw new HttpNotFoundException ();
 
-            _app.DropChannel (channel, pruneData: prune);
+            App.DropChannel (channel, pruneData: prune);
 
             await SendJsonResponseAsync (response, 200, string.Empty);
         }
-
-        private void AppShutdown (object? sender, EventArgs e)
-        {
-            Stop ();
-        }
-
-        [Conditional ("DEBUG")]
-        void LogDebug (string message, params object[] args) => Logger.Debug ($"[QuiuAdminServer] {message}", args);
-        void LogInfo (string message, params object[] args) => Logger.Info ($"[QuiuAdminServer] {message}", args);
-        void LogWarning (string message, params object[] args) => Logger.Warning ($"[QuiuAdminServer] {message}", args);
-        void LogError (string message, params object[] args) => Logger.Error ($"[QuiuAdminServer] {message}", args);
-
-        readonly Context _app;
-   }
+    }
 }

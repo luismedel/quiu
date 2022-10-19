@@ -124,6 +124,8 @@ namespace quiu.core
             _dataStorage.Dispose ();
         }
 
+        public override string ToString () => this.Guid.ToString ();
+
         int _insertCommand;
         int _selectCommand;
         int _selectManyCommand;

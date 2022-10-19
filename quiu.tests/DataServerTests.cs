@@ -1,22 +1,22 @@
 ﻿using System.Net;
+using quiu.core;
 using quiu.http;
 
 namespace quiu.tests;
 
-public class ServerTests
-    : ServerTestsBase<QuiuServer>
+public class DataServerTests
+    : HttpServerTestsBase<HttpDataServer>
 {
-    const string SERVER_HOST = $"http://localhost:8081";
-
-    protected override string ServerHost => SERVER_HOST;
-
-    protected override QuiuServer InitServer ()
+    protected override Config InitConfig ()
     {
-        App.Config["server_host"] = "*";
-        App.Config["server_port"] = "8081";
+        var result = new Config ();
+        result["server_host"] = ServerHost;
+        result["server_port"] = ServerPort;
 
-        return new QuiuServer (App);
+        return result;
     }
+
+    protected override HttpDataServer InitServer () => new HttpDataServer (App);
 
     [Fact]
     public async Task Test_Appemd ()

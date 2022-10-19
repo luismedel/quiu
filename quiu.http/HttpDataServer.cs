@@ -8,20 +8,25 @@ using quiu.core;
 
 namespace quiu.http
 {
-    public class QuiuServer : HttpServer
+    public class HttpDataServer : HttpServerBase
     {
+        public const string DEFAULT_HOST = "localhost";
         public const int DEFAULT_PORT = 27812;
 
-        public QuiuServer (Context app)
-            : base(app.Config.Get<string> ("server_host")!, app.Config.Get<int>("server_port", DEFAULT_PORT)!)
+        public HttpDataServer (Context app, string host, int port, CancellationToken cancellationToken)
+            : base (app, host, port, cancellationToken)
         {
-            _app = app;
-
-            _app.Shutdown += AppShutdown;
-
             RegisterRoute ("POST", "/channel/%guid", AppendData);
             RegisterRoute ("GET", "/channel/%guid/%offset", GetItem);
             RegisterRoute ("GET", "/channel/%guid/%offset/%count", GetItems);
+        }
+
+        public HttpDataServer (Context app)
+            : this (app,
+                    app.Config.Get<string> ("server_host", DEFAULT_HOST)!,
+                    app.Config.Get<int>("server_port", DEFAULT_PORT)!,
+                    app.CancellationToken)
+        {
         }
 
         async void GetItem(Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
@@ -29,7 +34,7 @@ namespace quiu.http
             var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
             Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
 
-            var channel = _app.GetChannel (guid);
+            var channel = App.GetChannel (guid);
             if (channel == null)
                 throw new HttpNotFoundException ();
 
@@ -44,7 +49,7 @@ namespace quiu.http
             Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
             int count = GetRequiredUrlArgument<int> (args, "count", int.TryParse);
 
-            var channel = _app.GetChannel (guid);
+            var channel = App.GetChannel (guid);
             if (channel == null)
                 throw new HttpNotFoundException ();
 
@@ -58,7 +63,7 @@ namespace quiu.http
         {
             var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
 
-            var channel = _app.GetChannel (guid);
+            var channel = App.GetChannel (guid);
             if (channel == null)
                 throw new HttpNotFoundException ();
 
@@ -83,18 +88,5 @@ namespace quiu.http
                 }
             }
         }
-
-        private void AppShutdown (object? sender, EventArgs e)
-        {
-            Stop ();
-        }
-
-        [Conditional ("DEBUG")]
-        void LogDebug (string message, params object[] args) => Logger.Debug ($"[QuiuServer] {message}", args);
-        void LogInfo (string message, params object[] args) => Logger.Info ($"[QuiuServer] {message}", args);
-        void LogWarning (string message, params object[] args) => Logger.Warning ($"[QuiuServer] {message}", args);
-        void LogError (string message, params object[] args) => Logger.Error ($"[QuiuServer] {message}", args);
-
-        readonly Context _app;
    }
 }

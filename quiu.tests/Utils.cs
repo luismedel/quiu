@@ -6,15 +6,22 @@ namespace quiu.tests
 {
     public static class Utils
     {
-        public static Context InitApp ()
+        public static Context InitApp (Config? initialConfig = null, string? pathSuffix = null)
         {
-            var datadir = Path.Combine (Path.GetTempPath (), $"quiu/tests-{DateTime.Now.ToString ("yyyy-MM-dd-hh-mm-ss-ff")}-{Guid.NewGuid().ToString("N")}");
+            if (pathSuffix == null)
+                pathSuffix = Guid.NewGuid ().ToString ("N");
+
+            Config config = new Config ();
+
+            if (initialConfig != null)
+                config.UpdateWith (initialConfig);
+
+            var datadir = config.Get<string>("data_dir", Path.Combine (Path.GetTempPath (), $"quiu/tests-{DateTime.Now.ToString ("yyyy-MM-dd-hh-mm-ss-ff")}-{pathSuffix}"))!;
+            config["data_dir"] = datadir;
+
             System.IO.Directory.CreateDirectory (datadir);
 
-            Config cfg = new Config ();
-            cfg["data_dir"] = datadir;
-
-            return new Context (cfg);
+            return new Context (config);
         }
 
         public static void DisposeApp (Context app)

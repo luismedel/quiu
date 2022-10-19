@@ -15,6 +15,8 @@ namespace quiu.core
             _app = app;
             _path = path;
 
+            _cts = CancellationTokenSource.CreateLinkedTokenSource (app.CancellationToken);
+
             _conn = new SQLiteConnection ($@"Data Source={_path};");
             _conn.Open ();
         }
@@ -33,7 +35,7 @@ namespace quiu.core
         public async Task ExecuteAsync (string command, params object[] args)
         {
             using (var cmd = CreateCommand (command, args))
-                await cmd.ExecuteNonQueryAsync (_app.CancellationToken);
+                await cmd.ExecuteNonQueryAsync (_cts.Token);
         }
 
         public T? ExecuteScalar<T> (string command, params object[] args)
@@ -52,7 +54,7 @@ namespace quiu.core
         {
             using (var cmd = CreateCommand (command, args))
             {
-                var data = await cmd.ExecuteScalarAsync (_app.CancellationToken);
+                var data = await cmd.ExecuteScalarAsync (_cts.Token);
                 if (data is DBNull)
                     return default (T?);
 
@@ -69,21 +71,22 @@ namespace quiu.core
         public async Task<DbDataReader> ExecuteReaderAsync (string command, params object[] args)
         {
             using (var cmd = CreateCommand (command, args))
-                return await cmd.ExecuteReaderAsync (_app.CancellationToken);
+                return await cmd.ExecuteReaderAsync (_cts.Token);
         }
 
         public int Execute (int commandId, params object[] args) => GetCachedCommand (commandId, args).ExecuteNonQuery ();
-        public async Task<int> ExecuteAsync (int commandId, params object[] args) => await GetCachedCommand (commandId, args).ExecuteNonQueryAsync (_app.CancellationToken);
+        public async Task<int> ExecuteAsync (int commandId, params object[] args) => await GetCachedCommand (commandId, args).ExecuteNonQueryAsync (_cts.Token);
 
         public DbDataReader ExecuteReader (int commandId, params object[] args) => GetCachedCommand (commandId, args).ExecuteReader ();
-        public async Task<DbDataReader> ExecuteReaderAsync (int commandId, params object[] args) => await GetCachedCommand (commandId, args).ExecuteReaderAsync (_app.CancellationToken);
+        public async Task<DbDataReader> ExecuteReaderAsync (int commandId, params object[] args) => await GetCachedCommand (commandId, args).ExecuteReaderAsync (_cts.Token);
 
         public T? ExecuteScalar<T> (int commandId, params object[] args) => (T?) Convert.ChangeType(GetCachedCommand (commandId, args).ExecuteScalar (), typeof(T));
-        public async Task<T?> ExecuteScalarAsync<T> (int commandId, params object[] args) => (T?) Convert.ChangeType (await GetCachedCommand (commandId, args).ExecuteScalarAsync (_app.CancellationToken), typeof (T));
+        public async Task<T?> ExecuteScalarAsync<T> (int commandId, params object[] args) => (T?) Convert.ChangeType (await GetCachedCommand (commandId, args).ExecuteScalarAsync (_cts.Token), typeof (T));
 
         public int PrepareCommand (string commandText)
         {
             _cachedCommands.Add (CreateCommand (commandText));
+            LogTrace ($" - Cached with ID={_cachedCommands.Count}.");
             return _cachedCommands.Count;
         }
 
@@ -97,6 +100,8 @@ namespace quiu.core
 
         SQLiteCommand CreateCommand (string commandText, params object[] args)
         {
+            LogTrace ($"Preparing command '{commandText.Replace('\n', ' ')}' with {args.Length} arguments.");
+
             var result = _conn.CreateCommand ();
             result.CommandText = commandText;
             if (args?.Length > 0)
@@ -104,11 +109,15 @@ namespace quiu.core
             return result;
         }
 
+        void LogTrace (string message, params object[] args) => Logger.Trace ($"[Storage] {message}", args);
+
         readonly List<SQLiteCommand> _cachedCommands = new List<SQLiteCommand> ();
         readonly SQLiteConnection _conn;
 
         readonly Context _app;
         readonly string _path;
+
+        readonly CancellationTokenSource _cts;
     }
 }
 

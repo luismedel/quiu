@@ -17,8 +17,10 @@
     <None Remove="SQLite" />
     <None Remove="Microsoft.Data.Sqlite.Core" />
     <None Remove="System.Data.SQLite.Core" />
+    <None Remove="YamlDotNet" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.116" />
+    <PackageReference Include="YamlDotNet" Version="12.0.2" />
   </ItemGroup>
 </Project>

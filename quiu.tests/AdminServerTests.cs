@@ -1,21 +1,23 @@
 ﻿using System.Net;
 using System.Text.Json;
+using quiu.core;
 using quiu.http;
 
 namespace quiu.tests;
 
 public class AdminServerTests
-    : ServerTestsBase<QuiuAdminServer>
+    : HttpServerTestsBase<HttpAdminServer>
 {
-    protected override string ServerHost => $"http://localhost:{QuiuAdminServer.DEFAULT_PORT}";
-
-    protected override QuiuAdminServer InitServer ()
+    protected override Config InitConfig ()
     {
-        App.Config["admin_server_host"] = "*";
-        App.Config["admin_server_port"] = QuiuAdminServer.DEFAULT_PORT;
+        var result = new Config ();
+        result["admin_server_host"] = ServerHost;
+        result["admin_server_port"] = ServerPort;
 
-        return new QuiuAdminServer (App);
+        return result;
     }
+
+    protected override HttpAdminServer InitServer () => new HttpAdminServer (App);
 
     [Fact]
     public async Task Test_CreateChannel()
