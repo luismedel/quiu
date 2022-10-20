@@ -80,8 +80,11 @@ namespace quiu.core
 
         public Channel AddChannelInternal (Guid guid, Dictionary<Guid, Channel> dest)
         {
-            if (dest.TryGetValue (guid, out _))
-                throw new InvalidOperationException ($"Channel {guid} already exists.");
+            if (dest.TryGetValue (guid, out var existing))
+            {
+                Logger.Warning ($"Channel {guid} already exists.");
+                return existing;
+            }
 
             var result = new Channel (this, guid);
             dest.Add (guid, result);

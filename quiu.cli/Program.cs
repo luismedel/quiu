@@ -95,7 +95,10 @@ namespace quiu.cli
 
         [Verb ("data-server", isDefault:true)]
         class DataServerOptions : ServerOptions
-        { }
+        {
+            [Option ("builtins", Separator = ',', Required = false, HelpText = "Add default channel with the specified Guids")]
+            public IEnumerable<Guid> BuiltinChannels { get; set; }
+        }
 
         [Verb ("admin-server")]
         class AdminServerOptions : ServerOptions
@@ -121,8 +124,11 @@ namespace quiu.cli
                               .WithParsed<DataServerOptions> (ExecDataServer)
                               .WithParsed<AdminServerOptions> (ExecAdminServer);
 
-                while (_app!.RunningTasks.Length > 0 && !_app!.CancellationToken.IsCancellationRequested)
-                    await Task.Delay (100);
+                if (_app != null)
+                {
+                    while (_app!.RunningTasks.Length > 0 && !_app!.CancellationToken.IsCancellationRequested)
+                        await Task.Delay (100);
+                }
             }
             catch (Exception ex)
             {
@@ -132,7 +138,6 @@ namespace quiu.cli
 #endif
             }
 
-            Console.WriteLine (":-)");
             Environment.Exit (0);
         }
 
@@ -158,6 +163,18 @@ namespace quiu.cli
         void ExecDataServer (DataServerOptions options)
         {
             CreateContext (options);
+
+            var builtins = options.BuiltinChannels.ToArray ();
+            if (builtins.Length > 0)
+            {
+                Logger.Info ($"Adding {builtins.Length} builtin(s)...");
+                foreach (var g in options.BuiltinChannels)
+                {
+                    Logger.Info ($" - {g}");
+                    _app!.AddChannel (g);
+                }
+            }
+
             _app!.EnqueueTask (StartServer (new HttpDataServer (_app!)));
         }
 
