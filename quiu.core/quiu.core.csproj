@@ -12,15 +12,20 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <LangVersion>latestmajor</LangVersion>
+    <DebugSymbols>true</DebugSymbols>
+    <DefineConstants>RELEASE;NET;NET6_0;NETCOREAPP</DefineConstants>
+    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="SQLite" />
     <None Remove="Microsoft.Data.Sqlite.Core" />
     <None Remove="System.Data.SQLite.Core" />
     <None Remove="YamlDotNet" />
+    <None Remove="NMaier.PlaneDB" />
+    <None Remove="ZoneTree" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.116" />
     <PackageReference Include="YamlDotNet" Version="12.0.2" />
+    <PackageReference Include="ZoneTree" Version="1.5.5" />
   </ItemGroup>
 </Project>

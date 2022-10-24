@@ -22,7 +22,6 @@ public class DataServerTests
     public async Task Test_Appemd ()
     {
         var chn = Utils.CreateChannel (App);
-        var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
 
         var resp =  await DoPost ($"/channel/{chn.Guid}", GetTestInput ());
         Assert.Equal (201, (int) resp.StatusCode);
@@ -32,14 +31,13 @@ public class DataServerTests
         Utils.AssertJsonValue (json, "error", false);
 
         // Verify backend side
-        Assert.Equal (1, chn.Storage.ExecuteScalar<int> (cmdSelectMaxRowId));
+        Assert.Equal (1, (int) chn.LastOffset);
     }
 
     [Fact]
     public async Task Test_AppendMany ()
     {
         var chn = Utils.CreateChannel (App);
-        var cmdSelectMaxRowId = chn.Storage.PrepareCommand ("select max(rowid) from data_t");
 
         var buffer = string.Join ('\n', Enumerable.Range (0, 10).Select (i => GetTestInput (i)));
 
@@ -50,7 +48,7 @@ public class DataServerTests
         Utils.AssertJsonValue (json, "error", false);
 
         // Verify backend side
-        Assert.Equal (10, chn.Storage.ExecuteScalar<int> (cmdSelectMaxRowId));
+        Assert.Equal (10, (int) chn.LastOffset);
     }
 
     [Fact]

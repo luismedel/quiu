@@ -44,13 +44,13 @@ public class AdminServerTests
         var channel = App.GetChannel (guid);
         Assert.NotNull (channel);
 
-        var dataPath = channel!.Storage.Path;
+        var dataPath = channel!.StoragePath;
 
         resp = await this.DoDelete ($"/channel/{guid}");
         Assert.Equal (200, (int) resp.StatusCode);
 
         Assert.Null (App.GetChannel (guid));
-        Assert.True (File.Exists (dataPath));
+        Assert.True (Directory.Exists (dataPath));
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class AdminServerTests
         var channel = App.GetChannel (guid);
         Assert.NotNull (channel);
 
-        var dataPath = channel!.Storage.Path;
+        var dataPath = channel!.StoragePath;
 
         resp = await this.DoDelete ($"/channel/{guid}?prune=true");
         Assert.Equal (200, (int) resp.StatusCode);

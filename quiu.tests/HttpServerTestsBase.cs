@@ -27,7 +27,7 @@ where T: HttpServerBase
         _app.Config["server_port"] = ServerPort;
         _server = InitServer ();
 
-        _server.RunLoop ();
+        _app.EnqueueTask(_server.RunLoop (), "server loop");
     }
 
     /// <summary>
@@ -42,7 +42,7 @@ where T: HttpServerBase
     /// <returns></returns>
     protected abstract T InitServer ();
 
-    public void Dispose ()
+    public virtual void Dispose ()
     {
         Utils.DisposeApp (_app);
     }

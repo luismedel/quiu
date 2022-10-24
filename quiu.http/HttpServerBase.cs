@@ -84,9 +84,9 @@ namespace quiu.http
             _watchdogTask?.Dispose ();
         }
 
-        async Task InnerLoop ()
+        async Task InnerLoopAsync ()
         {
-            // GetContextAsync does not allows cancellation.
+            // GetContextAsync does not allow cancellation.
             // We need to mimic it using a cancellable task to act as
             // a watchdog for external cancellation.
             _watchdogCts = CancellationTokenSource.CreateLinkedTokenSource (_cts.Token);
@@ -109,11 +109,50 @@ namespace quiu.http
 
                         var ctx = listenerTask.Result;
                         LogTrace ($"Handling connection from {ctx.Request.RemoteEndPoint}...");
-                        await HandleClientAsync (ctx);
+                        HandleClient (ctx);
                     }
                     catch (Exception ex)
                     {
                         LogError (ex.Message);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                LogInfo ("External cancellation detected");
+            }
+            catch (Exception ex)
+            {
+                LogError (ex.Message);
+                throw;
+            }
+            finally
+            {
+                Stop ();
+            }
+        }
+
+        async Task InnerLoop ()
+        {
+            try
+            {
+                while (_running && !_cts.IsCancellationRequested)
+                {
+                    HttpListenerContext? ctx = null;
+
+                    try
+                    {
+                        ctx = await _listener.GetContextAsync ();
+                        LogTrace ($"Handling connection from {ctx.Request.RemoteEndPoint}...");
+                        HandleClient (ctx);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError (ex.Message);
+                    }
+                    finally
+                    {
+                        ctx?.Response.Close ();
                     }
                 }
             }
@@ -220,7 +259,7 @@ namespace quiu.http
             return GetRequiredArgument<T> (key, args[key], convertfn);
         }
 
-        async Task HandleClientAsync (HttpListenerContext ctx)
+        void HandleClient (HttpListenerContext ctx)
         {
             try
             {
@@ -229,24 +268,24 @@ namespace quiu.http
                 {
                     LogTrace ($"No registered route found for {ctx.Request.Url}");
 
-                    await SendResponseAsync (ctx.Response, 404);
+                    SendResponse (ctx.Response, 404);
                     return;
                 }
 
                 var match = tmp.Value;
-                await Task.Run (() => match.Handler.Invoke (match.Arguments, ctx.Request, ctx.Response));
+                match.Handler.Invoke (match.Arguments, ctx.Request, ctx.Response);
             }
             catch (HttpListenerException ex)
             {
-                await SendJsonResponseAsync (ctx.Response, ex.ErrorCode, new { error = true, message = ex.Message });
+                SendJsonResponse (ctx.Response, ex.ErrorCode, new { error = true, message = ex.Message });
             }
             catch (Exception ex)
             {
-                await SendJsonResponseAsync (ctx.Response, 500, new { error = true, message = ex.Message });
+                SendJsonResponse (ctx.Response, 500, new { error = true, message = ex.Message });
             }
         }
 
-        protected async Task SendResponseAsync (HttpListenerResponse response, int statusCode, string? content = null)
+        protected void SendResponse (HttpListenerResponse response, int statusCode, string? content = null)
         {
             LogTrace ($" -> {statusCode}: {content}");
 
@@ -254,29 +293,29 @@ namespace quiu.http
             using (var sw = new StreamWriter (response.OutputStream))
             {
                 sw.AutoFlush = true;
-                await sw.WriteAsync ((content ?? String.Empty).ToCharArray (), this.CancellationToken);
+                sw.Write ((content ?? String.Empty).ToCharArray ());
             }
         }
 
-        protected async Task SendResponseAsync (HttpListenerResponse response, int statusCode, IEnumerable<string> data)
+        protected void SendResponse (HttpListenerResponse response, int statusCode, IEnumerable<string> data)
         {
             response.StatusCode = statusCode;
             using (var sw = new StreamWriter (response.OutputStream))
             {
                 sw.AutoFlush = false;
                 foreach (var line in data)
-                    await sw.WriteAsync (line.ToCharArray (), this.CancellationToken);
+                    sw.Write (line.ToCharArray ());
                 sw.Flush ();
             }
         }
 
-        protected async Task SendJsonResponseAsync (HttpListenerResponse response, int statusCode, object? data)
+        protected void SendJsonResponse (HttpListenerResponse response, int statusCode, object? data)
         {
             response.Headers.Add (HttpResponseHeader.ContentType, "application/json");
-            await SendResponseAsync (response, statusCode, data != null ? System.Text.Json.JsonSerializer.Serialize (data) : string.Empty);
+            SendResponse (response, statusCode, data != null ? System.Text.Json.JsonSerializer.Serialize (data) : string.Empty);
         }
 
-        protected async Task SendJsonResponseAsync<T> (HttpListenerResponse response, int statusCode, IAsyncEnumerable<T> data, Func<T, object> selector)
+        protected void SendJsonResponse<T> (HttpListenerResponse response, int statusCode, IEnumerable<T> data, Func<T, object> selector)
         {
             response.Headers.Add (HttpResponseHeader.ContentType, "application/json");
 
@@ -284,10 +323,10 @@ namespace quiu.http
             using (var sw = new StreamWriter (response.OutputStream))
             {
                 sw.AutoFlush = true;
-                await foreach (var d in data)
+                foreach (var d in data)
                 {
                     var line = System.Text.Json.JsonSerializer.Serialize (selector (d));
-                    await sw.WriteLineAsync (line.ToCharArray (), this.CancellationToken);
+                    sw.WriteLine (line.ToCharArray ());
                 }
             }
         }

@@ -6,8 +6,8 @@ namespace quiu.core
     {
         public static Data Empty = new Data (0, null);
 
-        public Int64 Timestamp { get; private set; }
-        public byte[]? Value { get; private set; }
+        public Int64 Timestamp;
+        public byte[]? Value;
 
         public int Size => this.Value!.Length;
 
@@ -15,6 +15,11 @@ namespace quiu.core
         {
             this.Timestamp = timestamp;
             this.Value = value;
+        }
+
+        public Data (byte[]? value)
+            : this(DateTime.Now.Ticks, value)
+        {
         }
     }
 }

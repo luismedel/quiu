@@ -175,13 +175,13 @@ namespace quiu.cli
                 }
             }
 
-            _app!.EnqueueTask (StartServer (new HttpDataServer (_app!)));
+            _app!.EnqueueTask (StartServer (new HttpDataServer (_app!)), "Data server loop");
         }
 
         void ExecAdminServer (AdminServerOptions options)
         {
             CreateContext (options);
-            _app!.EnqueueTask (StartServer(new HttpAdminServer (_app!)));
+            _app!.EnqueueTask (StartServer(new HttpAdminServer (_app!)), "Admin server loop");
         }
 
         Task? StartServer (HttpServerBase server) => server.RunLoop ();

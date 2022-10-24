@@ -2,6 +2,9 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using YamlDotNet.Core;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace quiu.core
 {
@@ -30,14 +33,15 @@ namespace quiu.core
         public string? Get (string key, string? @default = null) => ExpandEnvironmentVariables (this[key] as string ?? @default);
 
         public void Set<T> (string key, T? value) => this[key] = value == null ? null : value.ToString ();
-
         void Load (string path)
         {
-            var json = System.IO.File.ReadAllText (path);
+            var yaml = System.IO.File.ReadAllText (path);
 
-            var opts = new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip };
-            var dict = JsonSerializer.Deserialize<Dictionary<string, object>> (json, opts);
+            var deserializer = new DeserializerBuilder ()
+                .WithNamingConvention (UnderscoredNamingConvention.Instance)
+                .Build ();
 
+            var dict = deserializer.Deserialize<Dictionary<string, object>> (yaml);
             if (dict == null)
                 return;
 

@@ -29,7 +29,7 @@ namespace quiu.http
         {
         }
 
-        async void GetItem(Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void GetItem(Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
             Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
@@ -38,12 +38,12 @@ namespace quiu.http
             if (channel == null)
                 throw new HttpNotFoundException ();
 
-            var data = await channel.FetchAsync (offset);
+            var data = channel.Fetch (offset);
 
-            await SendJsonResponseAsync (response, 200, new { timestamp = new DateTime(data.Timestamp).ToString("u"), payload = Serializer.ToText(data.Value) });
+            SendJsonResponse (response, 200, new { payload = System.Text.Encoding.UTF8.GetString (data!) });
         }
 
-        async void GetItems (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void GetItems (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
             Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
@@ -53,13 +53,13 @@ namespace quiu.http
             if (channel == null)
                 throw new HttpNotFoundException ();
 
-            var data = channel.FetchAsync (offset, count);
-            var processor = (Data d) => new { timestamp = new DateTime (d.Timestamp).ToString ("u"), payload = Serializer.ToText (d.Value) };
+            var data = channel.Fetch (offset, count);
+            var processor = (byte[] d) => new { payload = System.Text.Encoding.UTF8.GetString (d) };
 
-            await SendJsonResponseAsync (response, 200, data, processor);
+            SendJsonResponse (response, 200, data, processor);
         }
 
-        async void AppendData (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void AppendData (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
 
@@ -74,17 +74,17 @@ namespace quiu.http
                 try
                 {
                     string? input;
-                    while ((input = await sr.ReadLineAsync ()) != null)
+                    while ((input = sr.ReadLine ()) != null)
                     {
-                        await channel.AppendAsync (System.Text.Encoding.UTF8.GetBytes (input));
+                        channel.Append (System.Text.Encoding.UTF8.GetBytes (input));
                         processed++;
                     }
 
-                    await SendJsonResponseAsync (response, 201, new { processed = processed, error = false });
+                    SendJsonResponse (response, 201, new { processed = processed, error = false });
                 }
                 catch (Exception ex)
                 {
-                    await SendJsonResponseAsync (response, 255, new { processed = processed, error = true, description = ex.Message });
+                    SendJsonResponse (response, 255, new { processed = processed, error = true, description = ex.Message });
                 }
             }
         }

@@ -66,23 +66,23 @@ namespace quiu.core
 
         public string GetFullPath (string relativePath) => Path.GetFullPath (Path.Combine (DataDirectory, relativePath));
 
-        public bool EnsurePathExists (string relativePath)
+        public string EnsurePathExists (string relativePath)
         {
             var path = Path.GetFullPath (Path.Combine (DataDirectory, relativePath));
 
             Logger.Info($"Ensuring {path} exists...");
 
-            var result = Directory.CreateDirectory (path).Exists;
-            Logger.Info ($" - {path}: {result}");
+            var exists = Directory.CreateDirectory (path).Exists;
+            Logger.Info ($" - {path} exists? {exists}");
 
-            return result;
+            return path;
         }
 
         public Channel AddChannelInternal (Guid guid, Dictionary<Guid, Channel> dest)
         {
             if (dest.TryGetValue (guid, out var existing))
             {
-                Logger.Warning ($"Channel {guid} already exists.");
+                Logger.Warning ($" - Channel {guid} already exists.");
                 return existing;
             }
 
@@ -126,7 +126,7 @@ namespace quiu.core
             try
             {
                 if (pruneData)
-                    File.Delete (channel.Storage.Path);
+                    channel.PruneData();
             }
             catch (IOException)
             {
@@ -136,14 +136,14 @@ namespace quiu.core
             return true;
         }
 
-        public void EnqueueTask (Task? task)
+        public void EnqueueTask (Task? task, string taskName)
         {
             if (task == null || task.IsCompleted)
                 return;
 
             lock (_runningTasks)
             {
-                Logger.Trace ($"Enqueuing task {task.Id}.");
+                Logger.Trace ($"Enqueuing task '{taskName}'.");
                 _runningTasks.Add (task);
 
                 if (_runningTasks.Count >= _runningTasksThreshold)

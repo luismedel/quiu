@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using Tenray.ZoneTree;
+using Tenray.ZoneTree.Comparers;
+using Tenray.ZoneTree.Serializers;
 
 namespace quiu.core
 {
@@ -7,110 +10,71 @@ namespace quiu.core
         : IDisposable
     {
         public Guid Guid { get; private set; }
-
         public string Name { get; set; } = string.Empty;
-
-        public Storage Storage => _dataStorage;
+        public string StoragePath => _app.GetFullPath ($"channels/{this.Guid}");
+        public Int64 LastOffset => _offset;
 
         public Channel (Context app, Guid guid)
         {
             this.Guid = guid;
 
             _app = app;
-            _dataStorage = this.InitDataStorage ();
+
+            LogInfo ("Initalizing storage...");
+
+            var path = _app.EnsurePathExists (this.StoragePath);
+            LogInfo ($" - {path}");
+
+            _dataStorage = new ZoneTreeFactory<Int64, byte[]> ()
+                            .SetComparer (new Int64ComparerAscending ())
+                            .SetDataDirectory (path)
+                            .SetKeySerializer (new Int64Serializer ())
+                            .SetValueSerializer (new ByteArraySerializer ())
+                            .OpenOrCreate ();
+
+            LogInfo ("Done.");
 
             this.LoadMetadata ();
         }
 
         void LoadMetadata ()
         {
+            LogInfo ("Getting last offset...");
+            //var keys = _dataStorage.Keys;
+            //_offset = (keys.Count () == 0) ? 0 : (keys.Max () + 1);
+            LogInfo ($" - Last offset: {_offset}");
         }
 
-        Storage InitDataStorage ()
+        public void Append (byte[] data) => _dataStorage.Upsert (Interlocked.Increment (ref _offset), data);
+        
+        public byte[]? Fetch (Int64 offset) => _dataStorage.TryGet (offset, out var result) ? result : null;
+
+        public IEnumerable<byte[]> Fetch (Int64 offset, int count)
         {
-            this.LogInfo ("Initializing data storage...");
-
-            _app.EnsurePathExists ("channels");
-            var path = _app.GetFullPath ($"channels/{this.Guid.ToString ("N")}_data.db");
-
-            this.LogInfo($"- {path}");
-
-            var result = new Storage (_app, path);
-
-            this.LogInfo (" - Creating database tables...");
-
-            result.Execute (@"
-            CREATE TABLE IF NOT EXISTS meta_t (
-                guid TEXT,
-                name TEXT,
-                ttl INTEGER
-            )");
-
-            result.Execute (@"
-            CREATE TABLE IF NOT EXISTS data_t (
-                timestamp INTEGER,
-                data BLOB
-            )");
-
-            this.LogInfo (" - Creating indices...");
-
-            result.Execute (@"
-            CREATE INDEX IF NOT EXISTS idx_channel_timestamp
-            ON data_t(timestamp)");
-
-            this.LogInfo (" - Preparing queries...");
-
-            _insertCommand = result.PrepareCommand ("insert into data_t values (?, ?)");
-            _selectCommand = result.PrepareCommand ("select timestamp, data from data_t where rowid = ? limit 1");
-            _selectManyCommand = result.PrepareCommand ("select timestamp, data from data_t where rowid >= ? order by rowid asc limit ?");
-            _upsertCommand = result.PrepareCommand ("insert or replace into data_t (timestamp, data) values (?, ?);");
-
-            this.LogInfo ("Done.");
-
-            return result;
-        }
-
-        public int Append (byte[] data) => _dataStorage.Execute(_insertCommand, DateTime.Now.Ticks, data);
-        public async Task<int> AppendAsync (byte[] data) => await _dataStorage.ExecuteAsync (_insertCommand, DateTime.Now.Ticks, data);
-
-        public Data Fetch (Int64 offset)
-        {
-            using (var rs = _dataStorage.ExecuteReader (_selectCommand, offset))
+            for (var i = 0; i < count; i++)
             {
-                if (!rs.Read ())
-                    return Data.Empty;
+                if (!_dataStorage.TryGet (offset++, out var item))
+                    break;
 
-                return new Data((Int64) rs[0], (byte[]) rs[1]);
+                yield return item;
             }
         }
 
-        public IEnumerable<Data> Fetch (Int64 offset, int count)
+        public void PruneData ()
         {
-            using (var rs = _dataStorage.ExecuteReader (_selectManyCommand, offset, count))
+            try
             {
-                while (rs.Read ())
-                    yield return new Data ((Int64) rs[0], (byte[]) rs[1]);
+                Directory.Delete (this.StoragePath, true);
+            }
+            catch (Exception ex)
+            {
+                LogWarning ($"Cant prune data for channel {this.Guid}: {ex.Message}");
             }
         }
 
-        public async Task<Data> FetchAsync (Int64 offset)
+        public void Dispose ()
         {
-            using (var rs = await _dataStorage.ExecuteReaderAsync (_selectCommand, offset))
-            {
-                if (!await rs.ReadAsync ())
-                    return Data.Empty;
-
-                return new Data ((Int64) rs[0], (byte[]) rs[1]);
-            }
-        }
-
-        public async IAsyncEnumerable<Data> FetchAsync (Int64 offset, int count)
-        {
-            using (var rs = await _dataStorage.ExecuteReaderAsync (_selectManyCommand, offset, count))
-            {
-                while (await rs.ReadAsync ())
-                    yield return new Data ((Int64) rs[0], (byte[]) rs[1]);
-            }
+            _dataStorage.Dispose ();
         }
 
         [Conditional ("DEBUG")]
@@ -119,19 +83,11 @@ namespace quiu.core
         void LogWarning (string message, params object[] args) => Logger.Warning ($"[#{this.Guid}] {message}", args);
         void LogError (string message, params object[] args) => Logger.Error ($"[#{this.Guid}] {message}", args);
 
-        public void Dispose ()
-        {
-            _dataStorage.Dispose ();
-        }
-
         public override string ToString () => this.Guid.ToString ();
 
-        int _insertCommand;
-        int _selectCommand;
-        int _selectManyCommand;
-        int _upsertCommand;
+        Int64 _offset = 0;
 
-        readonly Storage _dataStorage;
+        readonly IZoneTree<Int64, byte[]> _dataStorage;
         readonly Context _app;
     }
 }

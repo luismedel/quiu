@@ -28,13 +28,13 @@ namespace quiu.http
         {
         }
 
-        async void CreateChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void CreateChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var channel = App.AddChannel ();
-            await SendJsonResponseAsync (response, 201, new { guid = channel.Guid });
+            SendJsonResponse (response, 201, new { guid = channel.Guid });
         }
 
-        async void DropChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void DropChannel (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = this.GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
             var prune = this.GetQueryArgument<bool> (request.QueryString, "prune", false, bool.TryParse);
@@ -45,7 +45,7 @@ namespace quiu.http
 
             App.DropChannel (channel, pruneData: prune);
 
-            await SendJsonResponseAsync (response, 200, string.Empty);
+            SendJsonResponse (response, 200, string.Empty);
         }
     }
 }
