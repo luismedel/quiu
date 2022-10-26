@@ -9,8 +9,8 @@ quiu (pronounced as queue) is an attemp to create a working message broker.
 ```sh
 $ quiu.cli --help
 
-  data-server     Start the data server
-  admin-server    Start the admin server
+  cloent          Start the local client (currently WIP)
+  server          Start the data server
   help            Display more information on a specific command.
   version         Display version information.
 ```
@@ -20,7 +20,7 @@ $ quiu.cli --help
 Starts the data server. The part you use to ingest and read data.
 
 ```sh
-$ quiu.cli data-server --help
+$ quiu.cli server --help
 
   --builtins      Add default channel with the specified Guids
   -h, --host      (Default: *) Server host address
@@ -32,16 +32,16 @@ $ quiu.cli data-server --help
 
 ### Examples
 
-Starts a data server using the config in the file `config.yaml`.
+Starts a server using the config in the file `config.yaml`.
 
 ```sh
-$ quiu.cli data-server -c config.yaml 
+$ quiu.cli server -c config.yaml 
 ```
 
 Starts a data server using the config in the file `config.yaml`, with two channels `65894249-a68a-4ab2-b33d-7d26dee6038a` and `65894249-a68a-4ab2-b33d-7d26dee6038b`.
 
 ```sh
-$ quiu.cli data-server -c config.yaml --builtins 65894249-a68a-4ab2-b33d-7d26dee6038a,65894249-a68a-4ab2-b33d-7d26dee6038b 
+$ quiu.cli server -c config.yaml --builtins 65894249-a68a-4ab2-b33d-7d26dee6038a,65894249-a68a-4ab2-b33d-7d26dee6038b 
 ```
 
 ## Ingesting data
@@ -78,22 +78,16 @@ Example: get 5 items starting at offset 6.
 curl -X GET 'http://localhost:27812/channel/71d35017-e0a8-412a-b340-07215eead781/6/5'
 ```
 
-## admin-server
+## Administrative commands
 
-Starts the admin server. The part you use to manage channels.
-
-This functionality will be merged into specific paths in `data-server`.
+Sorry, WIP.
 
 ## Config file
 
 ```yaml
-# Data server endpoint
+# Server endpoint
 server_host: localhost
 server_port: 27812
-
-# Admin server endpoint
-admin_server_host: localhost
-admin_server_port: 2781
 
 # Data directory
 data_dir: $HOME/var/quiu/

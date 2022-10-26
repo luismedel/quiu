@@ -69,13 +69,17 @@ namespace quiu.cli
             Config? _config;
         }
 
+        [Verb ("server", isDefault: true)]
         class ServerOptions : OptionsBase
         {
             [Option ('h', "host", Required = false, Default = "*", HelpText = "Server host address")]
             public string? ServerHost { get; set; }
 
-            [Option ('p', "port", Required = false, Default = HttpDataServer.DEFAULT_PORT, HelpText = "Server port")]
+            [Option ('p', "port", Required = false, Default = HttpServer.DEFAULT_PORT, HelpText = "Server port")]
             public int? ServerPort { get; set; }
+
+            [Option ("builtins", Separator = ',', Required = false, HelpText = "Add default channel with the specified Guids")]
+            public IEnumerable<Guid> BuiltinChannels { get; set; }
 
             protected override void SetOptionsFromConfig ()
             {
@@ -93,16 +97,11 @@ namespace quiu.cli
             }
         }
 
-        [Verb ("data-server", isDefault:true)]
-        class DataServerOptions : ServerOptions
+        [Verb ("client", isDefault: false)]
+        class ClientOptions /*: OptionsBase*/
         {
-            [Option ("builtins", Separator = ',', Required = false, HelpText = "Add default channel with the specified Guids")]
-            public IEnumerable<Guid> BuiltinChannels { get; set; }
+            // TODO: Add local client options
         }
-
-        [Verb ("admin-server")]
-        class AdminServerOptions : ServerOptions
-        { }
 #pragma warning restore CS8618
 
 
@@ -120,9 +119,8 @@ namespace quiu.cli
 
             try
             {
-                Parser.Default.ParseArguments<DataServerOptions, AdminServerOptions> (args)
-                              .WithParsed<DataServerOptions> (ExecDataServer)
-                              .WithParsed<AdminServerOptions> (ExecAdminServer);
+                Parser.Default.ParseArguments<ServerOptions> (args)
+                              .WithParsed<ServerOptions> (ExecServer);
 
                 if (_app != null)
                 {
@@ -160,7 +158,7 @@ namespace quiu.cli
             }
         }
 
-        void ExecDataServer (DataServerOptions options)
+        void ExecServer (ServerOptions options)
         {
             CreateContext (options);
 
@@ -175,13 +173,7 @@ namespace quiu.cli
                 }
             }
 
-            _app!.EnqueueTask (StartServer (new HttpDataServer (_app!)), "Data server loop");
-        }
-
-        void ExecAdminServer (AdminServerOptions options)
-        {
-            CreateContext (options);
-            _app!.EnqueueTask (StartServer(new HttpAdminServer (_app!)), "Admin server loop");
+            _app!.EnqueueTask (StartServer (new HttpServer (_app!)), "Data server loop");
         }
 
         Task? StartServer (HttpServerBase server) => server.RunLoop ();

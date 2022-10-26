@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Collections.Specialized;
 using quiu.core;
 using YamlDotNet.Core.Tokens;
+using System.Web;
 
 namespace quiu.http
 {
@@ -17,13 +18,13 @@ namespace quiu.http
             public string Method;
             public Regex Regex;
             public string[] ArgNames;
-            public Action<Dictionary<string, string>, HttpListenerRequest, HttpListenerResponse> Handler;
+            public Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> Handler;
         }
 
         struct RouteMatch
         {
-            public Dictionary<string, string> Arguments;
-            public Action<Dictionary<string, string>, HttpListenerRequest, HttpListenerResponse> Handler;
+            public NameValueCollection Arguments;
+            public Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> Handler;
         }
 
         protected Context App => _app;
@@ -171,7 +172,7 @@ namespace quiu.http
             }
         }
 
-        public void RegisterRoute (string method, string pattern, Action<Dictionary<string, string>, HttpListenerRequest, HttpListenerResponse> handler, bool optionalEndSlash = true)
+        public void RegisterRoute (string method, string pattern, Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> handler, bool optionalEndSlash = true)
         {
             const string ARG_PATTERN = @"%([^/]+)";
 
@@ -199,7 +200,7 @@ namespace quiu.http
                 if (!m.Success)
                     continue;
 
-                Dictionary<string, string> args = new Dictionary<string, string> (StringComparer.InvariantCultureIgnoreCase);
+                NameValueCollection args = new NameValueCollection (StringComparer.InvariantCultureIgnoreCase);
                 for (int i = 1; i < m.Groups.Count; i++)
                     args[r.ArgNames[i - 1]] = m.Groups[i].Value;
 
@@ -209,7 +210,13 @@ namespace quiu.http
             return null;
         }
 
-        T GetArgument<T> (string key, string? value, T @default, TypeConvertDelegate<T>? convertfn = null)
+        protected NameValueCollection GetBodyArguments (HttpListenerRequest request)
+        {
+            using (var sr = new StreamReader (request.InputStream))
+                return HttpUtility.ParseQueryString (sr.ReadToEnd ());
+        }
+
+        T GetArgumentInternal<T> (string key, string? value, T @default, TypeConvertDelegate<T>? convertfn = null)
         {
             if (string.IsNullOrEmpty (value))
                 return @default;
@@ -223,7 +230,7 @@ namespace quiu.http
             return converted;
         }
 
-        T GetRequiredArgument<T> (string key, string? value, TypeConvertDelegate<T>? convertfn = null)
+        T GetRequiredArgumentInternal<T> (string key, string? value, TypeConvertDelegate<T>? convertfn = null)
         {
             if (string.IsNullOrEmpty (value))
                 throw new HttpRequiredParamException ($"Missing value for '{key}'");
@@ -237,26 +244,14 @@ namespace quiu.http
             return converted;
         }
 
-        protected T GetUrlArgument<T> (Dictionary<string, string> args, string key, T @default, TypeConvertDelegate<T>? convertfn = null)
+        protected T GetArgument<T> (NameValueCollection args, string key, T @default, TypeConvertDelegate<T>? convertfn = null)
         {
-            args.TryGetValue (key, out var value);
-            return GetArgument<T> (key, value, @default, convertfn);
+            return GetArgumentInternal<T> (key, args[key], @default, convertfn);
         }
 
-        protected T GetRequiredUrlArgument<T> (Dictionary<string, string> args, string key, TypeConvertDelegate<T>? convertfn = null)
+        protected T GetRequiredArgument<T> (NameValueCollection args, string key, TypeConvertDelegate<T>? convertfn = null)
         {
-            args.TryGetValue (key, out var value);
-            return GetRequiredArgument<T> (key, value, convertfn);
-        }
-
-        protected T GetQueryArgument<T> (NameValueCollection args, string key, T @default, TypeConvertDelegate<T>? convertfn = null)
-        {
-            return GetArgument<T> (key, args[key], @default, convertfn);
-        }
-
-        protected T GetRequiredQueryArgument<T> (NameValueCollection args, string key, TypeConvertDelegate<T>? convertfn = null)
-        {
-            return GetRequiredArgument<T> (key, args[key], convertfn);
+            return GetRequiredArgumentInternal<T> (key, args[key], convertfn);
         }
 
         void HandleClient (HttpListenerContext ctx)

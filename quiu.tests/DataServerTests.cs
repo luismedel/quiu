@@ -5,7 +5,7 @@ using quiu.http;
 namespace quiu.tests;
 
 public class DataServerTests
-    : HttpServerTestsBase<HttpDataServer>
+    : HttpServerTestsBase<HttpServer>
 {
     protected override Config InitConfig ()
     {
@@ -16,7 +16,7 @@ public class DataServerTests
         return result;
     }
 
-    protected override HttpDataServer InitServer () => new HttpDataServer (App);
+    protected override HttpServer InitServer () => new HttpServer (App);
 
     [Fact]
     public async Task Test_Appemd ()

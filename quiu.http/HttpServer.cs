@@ -5,23 +5,27 @@ using System.Threading.Channels;
 using System.Diagnostics;
 
 using quiu.core;
+using System.Collections.Specialized;
 
 namespace quiu.http
 {
-    public class HttpDataServer : HttpServerBase
+    public class HttpServer : HttpServerBase
     {
         public const string DEFAULT_HOST = "localhost";
         public const int DEFAULT_PORT = 27812;
 
-        public HttpDataServer (Context app, string host, int port, CancellationToken cancellationToken)
+        public HttpServer (Context app, string host, int port, CancellationToken cancellationToken)
             : base (app, host, port, cancellationToken)
         {
             RegisterRoute ("POST", "/channel/%guid", AppendData);
             RegisterRoute ("GET", "/channel/%guid/%offset", GetItem);
             RegisterRoute ("GET", "/channel/%guid/%offset/%count", GetItems);
+
+            RegisterRoute ("POST", "/admin/channel/new", CreateChannel);
+            RegisterRoute ("DELETE", "/admin/channel/%guid", DropChannel);
         }
 
-        public HttpDataServer (Context app)
+        public HttpServer (Context app)
             : this (app,
                     app.Config.Get<string> ("server_host", DEFAULT_HOST)!,
                     app.Config.Get<int>("server_port", DEFAULT_PORT)!,
@@ -29,10 +33,10 @@ namespace quiu.http
         {
         }
 
-        void GetItem(Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void GetItem(NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
-            var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
-            Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
+            var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
+            Int64 offset = GetRequiredArgument<Int64> (segments, "offset", Int64.TryParse);
 
             var channel = App.GetChannel (guid);
             if (channel == null)
@@ -43,11 +47,11 @@ namespace quiu.http
             SendJsonResponse (response, 200, new { payload = System.Text.Encoding.UTF8.GetString (data!) });
         }
 
-        void GetItems (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void GetItems (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
-            var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
-            Int64 offset = GetRequiredUrlArgument<Int64> (args, "offset", Int64.TryParse);
-            int count = GetRequiredUrlArgument<int> (args, "count", int.TryParse);
+            var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
+            Int64 offset = GetRequiredArgument<Int64> (segments, "offset", Int64.TryParse);
+            int count = GetRequiredArgument<int> (segments, "count", int.TryParse);
 
             var channel = App.GetChannel (guid);
             if (channel == null)
@@ -59,9 +63,9 @@ namespace quiu.http
             SendJsonResponse (response, 200, data, processor);
         }
 
-        void AppendData (Dictionary<string, string> args, HttpListenerRequest request, HttpListenerResponse response)
+        void AppendData (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
-            var guid = GetRequiredUrlArgument<Guid> (args, "guid", Guid.TryParse);
+            var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
 
             var channel = App.GetChannel (guid);
             if (channel == null)
@@ -88,5 +92,28 @@ namespace quiu.http
                 }
             }
         }
-   }
+
+        void CreateChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        {
+            var args = GetBodyArguments (request);
+            var guid = GetArgument<Guid> (args, "guid", Guid.Empty, Guid.TryParse);
+
+            var channel = guid == Guid.Empty ? App.AddChannel () : App.AddChannel (guid);
+            SendJsonResponse (response, 201, new { guid = channel.Guid });
+        }
+
+        void DropChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        {
+            var guid = this.GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
+            var prune = this.GetArgument<bool> (request.QueryString, "prune", false, bool.TryParse);
+
+            var channel = App.GetChannel (guid);
+            if (channel == null)
+                throw new HttpNotFoundException ();
+
+            App.DropChannel (channel, pruneData: prune);
+
+            SendJsonResponse (response, 200, string.Empty);
+        }
+    }
 }
