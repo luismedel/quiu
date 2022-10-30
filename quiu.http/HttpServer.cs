@@ -23,6 +23,9 @@ namespace quiu.http
 
             RegisterRoute ("POST", "/admin/channel/new", CreateChannel);
             RegisterRoute ("DELETE", "/admin/channel/%guid", DropChannel);
+
+            _wal = new WAL ();
+            _wal.Start();
         }
 
         public HttpServer (Context app)
@@ -33,7 +36,7 @@ namespace quiu.http
         {
         }
 
-        void GetItem(NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        async Task GetItem(NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
             Int64 offset = GetRequiredArgument<Int64> (segments, "offset", Int64.TryParse);
@@ -44,10 +47,10 @@ namespace quiu.http
 
             var data = channel.Fetch (offset);
 
-            SendJsonResponse (response, 200, new { payload = System.Text.Encoding.UTF8.GetString (data!) });
+            await response.SendJsonResponseAsync (200, new { payload = System.Text.Encoding.UTF8.GetString (data!) });
         }
 
-        void GetItems (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        async Task GetItems (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
             Int64 offset = GetRequiredArgument<Int64> (segments, "offset", Int64.TryParse);
@@ -60,10 +63,10 @@ namespace quiu.http
             var data = channel.Fetch (offset, count);
             var processor = (byte[] d) => new { payload = System.Text.Encoding.UTF8.GetString (d) };
 
-            SendJsonResponse (response, 200, data, processor);
+            await response.SendJsonResponseAsync (200, data, processor);
         }
 
-        void AppendData (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        async Task AppendData (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
 
@@ -71,38 +74,67 @@ namespace quiu.http
             if (channel == null)
                 throw new HttpNotFoundException ();
 
+            Action? whenPersisted = null;
+
+            int commited = 0;
+
+            var nowait = int.TryParse (request.Headers["X-Quiu-NoWait"], out var v) && v == 1;
+            var wait = !nowait;
+
+            List<Task>? waitTasks = null;
+            if (wait)
+            {
+                whenPersisted = () => Interlocked.Increment(ref commited);
+                waitTasks = new List<Task> ();
+            }
+
             using (var sr = new StreamReader (request.InputStream))
             {
                 int processed = 0;
-
                 try
                 {
                     string? input;
                     while ((input = sr.ReadLine ()) != null)
                     {
-                        channel.Append (System.Text.Encoding.UTF8.GetBytes (input));
+                        var data = System.Text.Encoding.UTF8.GetBytes (input);
+                        var t = _wal.Enqueue ((channel, data), whenPersisted);
+                        waitTasks?.Add (t!);
+
                         processed++;
                     }
 
-                    SendJsonResponse (response, 201, new { processed = processed, error = false });
+                    if (wait)
+                    {
+                        var t = waitTasks!.Count == 1 ? waitTasks![0] : Task.WhenAll (waitTasks!);
+                        await t;
+                    }
+
+                    var status = processed == commited ? 201 : 202;
+                    await response.SendJsonResponseAsync (status, new { processed = processed, commited = commited, error = false });
+                }
+                catch (HttpListenerException ex)
+                {
+                    LogError (ex.Message);
+                    await response.SendJsonResponseAsync (ex.ErrorCode, new { processed = processed, commited = commited, error = true, message = ex.Message });
                 }
                 catch (Exception ex)
                 {
-                    SendJsonResponse (response, 255, new { processed = processed, error = true, description = ex.Message });
+                    LogError (ex.Message);
+                    await response.SendJsonResponseAsync (500, new { processed = processed, commited = commited, error = true, message = ex.Message });
                 }
             }
         }
 
-        void CreateChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        async Task CreateChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
             var args = GetBodyArguments (request);
             var guid = GetArgument<Guid> (args, "guid", Guid.Empty, Guid.TryParse);
 
             var channel = guid == Guid.Empty ? App.AddChannel () : App.AddChannel (guid);
-            SendJsonResponse (response, 201, new { guid = channel.Guid });
+            await response.SendJsonResponseAsync (201, new { guid = channel.Guid, error = false });
         }
 
-        void DropChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
+        async Task DropChannel (NameValueCollection segments, HttpListenerRequest request, HttpListenerResponse response)
         {
             var guid = this.GetRequiredArgument<Guid> (segments, "guid", Guid.TryParse);
             var prune = this.GetArgument<bool> (request.QueryString, "prune", false, bool.TryParse);
@@ -113,7 +145,15 @@ namespace quiu.http
 
             App.DropChannel (channel, pruneData: prune);
 
-            SendJsonResponse (response, 200, string.Empty);
+            await response.SendJsonResponseAsync (200, new { error = false });
         }
+
+        public override void Dispose ()
+        {
+            _wal.Dispose ();
+            base.Dispose ();
+        }
+
+        readonly WAL _wal;
     }
 }

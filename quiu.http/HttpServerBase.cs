@@ -18,13 +18,13 @@ namespace quiu.http
             public string Method;
             public Regex Regex;
             public string[] ArgNames;
-            public Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> Handler;
+            public Func<NameValueCollection, HttpListenerRequest, HttpListenerResponse, Task> Handler;
         }
 
         struct RouteMatch
         {
             public NameValueCollection Arguments;
-            public Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> Handler;
+            public Func<NameValueCollection, HttpListenerRequest, HttpListenerResponse, Task> Handler;
         }
 
         protected Context App => _app;
@@ -110,7 +110,7 @@ namespace quiu.http
 
                         var ctx = listenerTask.Result;
                         LogTrace ($"Handling connection from {ctx.Request.RemoteEndPoint}...");
-                        HandleClient (ctx);
+                        await HandleClientAsync (ctx);
                     }
                     catch (Exception ex)
                     {
@@ -145,7 +145,13 @@ namespace quiu.http
                     {
                         ctx = await _listener.GetContextAsync ();
                         LogTrace ($"Handling connection from {ctx.Request.RemoteEndPoint}...");
-                        HandleClient (ctx);
+                        await HandleClientAsync (ctx);
+                    }
+                    catch (HttpListenerException ex)
+                    {
+                        LogError (ex.Message);
+                        if (ctx != null)
+                            await ctx.Response.SendJsonResponseAsync (ex.ErrorCode, new { error = true, message = ex.Message });
                     }
                     catch (Exception ex)
                     {
@@ -172,7 +178,7 @@ namespace quiu.http
             }
         }
 
-        public void RegisterRoute (string method, string pattern, Action<NameValueCollection, HttpListenerRequest, HttpListenerResponse> handler, bool optionalEndSlash = true)
+        public void RegisterRoute (string method, string pattern, Func<NameValueCollection, HttpListenerRequest, HttpListenerResponse, Task> handler, bool optionalEndSlash = true)
         {
             const string ARG_PATTERN = @"%([^/]+)";
 
@@ -254,7 +260,7 @@ namespace quiu.http
             return GetRequiredArgumentInternal<T> (key, args[key], convertfn);
         }
 
-        void HandleClient (HttpListenerContext ctx)
+        async Task HandleClientAsync (HttpListenerContext ctx)
         {
             try
             {
@@ -263,66 +269,21 @@ namespace quiu.http
                 {
                     LogTrace ($"No registered route found for {ctx.Request.Url}");
 
-                    SendResponse (ctx.Response, 404);
+                    await ctx.Response.SendResponseAsync (404);
                     return;
                 }
 
                 var match = tmp.Value;
-                match.Handler.Invoke (match.Arguments, ctx.Request, ctx.Response);
+                await match.Handler.Invoke (match.Arguments, ctx.Request, ctx.Response);
             }
             catch (HttpListenerException ex)
             {
-                SendJsonResponse (ctx.Response, ex.ErrorCode, new { error = true, message = ex.Message });
+                LogError (ex.Message);
+                await ctx.Response.SendJsonResponseAsync(ex.ErrorCode, new { error = true, message = ex.Message });
             }
             catch (Exception ex)
             {
-                SendJsonResponse (ctx.Response, 500, new { error = true, message = ex.Message });
-            }
-        }
-
-        protected void SendResponse (HttpListenerResponse response, int statusCode, string? content = null)
-        {
-            LogTrace ($" -> {statusCode}: {content}");
-
-            response.StatusCode = statusCode;
-            using (var sw = new StreamWriter (response.OutputStream))
-            {
-                sw.AutoFlush = true;
-                sw.Write ((content ?? String.Empty).ToCharArray ());
-            }
-        }
-
-        protected void SendResponse (HttpListenerResponse response, int statusCode, IEnumerable<string> data)
-        {
-            response.StatusCode = statusCode;
-            using (var sw = new StreamWriter (response.OutputStream))
-            {
-                sw.AutoFlush = false;
-                foreach (var line in data)
-                    sw.Write (line.ToCharArray ());
-                sw.Flush ();
-            }
-        }
-
-        protected void SendJsonResponse (HttpListenerResponse response, int statusCode, object? data)
-        {
-            response.Headers.Add (HttpResponseHeader.ContentType, "application/json");
-            SendResponse (response, statusCode, data != null ? System.Text.Json.JsonSerializer.Serialize (data) : string.Empty);
-        }
-
-        protected void SendJsonResponse<T> (HttpListenerResponse response, int statusCode, IEnumerable<T> data, Func<T, object> selector)
-        {
-            response.Headers.Add (HttpResponseHeader.ContentType, "application/json");
-
-            response.StatusCode = statusCode;
-            using (var sw = new StreamWriter (response.OutputStream))
-            {
-                sw.AutoFlush = true;
-                foreach (var d in data)
-                {
-                    var line = System.Text.Json.JsonSerializer.Serialize (selector (d));
-                    sw.WriteLine (line.ToCharArray ());
-                }
+                await ctx.Response.SendJsonResponseAsync (500, new { error = true, message = ex.Message });
             }
         }
 

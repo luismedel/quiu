@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Specialized;
+using System.Net;
 
 using quiu.core;
 using quiu.http;
@@ -47,20 +48,43 @@ where T: HttpServerBase
         Utils.DisposeApp (_app);
     }
 
-    protected async Task<HttpResponseMessage> DoGet (string path)
+    protected async Task<HttpResponseMessage> DoGet (string path, NameValueCollection? headers = null)
     {
         var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
-            return await client.GetAsync (url);
+        {
+            using (var req = new HttpRequestMessage (HttpMethod.Get, url))
+            {
+                if (headers != null)
+                {
+                    foreach (var key in headers!.AllKeys)
+                        req.Headers.Add (key!, headers[key]);
+                }
+
+                return await client.SendAsync (req);
+            }
+        }
     }
 
-    protected async Task<HttpResponseMessage> DoPost (string path, string data)
+    protected async Task<HttpResponseMessage> DoPost (string path, string data, NameValueCollection? headers = null)
     {
         var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
-           return await client.PostAsync (url, new StringContent (data, System.Text.Encoding.UTF8));
+        {
+            using (var req = new HttpRequestMessage (HttpMethod.Post, url))
+            {
+                if (headers != null)
+                {
+                    foreach (var key in headers!.AllKeys)
+                        req.Headers.Add (key!, headers[key]);
+                }
+
+                req.Content = new StringContent (data, System.Text.Encoding.UTF8);
+                return await client.SendAsync (req);
+            }
+        }
     }
 
     protected async Task<HttpResponseMessage> DoDelete (string path)
@@ -68,7 +92,8 @@ where T: HttpServerBase
         var url = $"{this.ServerRoot}{path}";
 
         using (var client = new HttpClient ())
-            return await client.DeleteAsync (url);
+            using (var req = new HttpRequestMessage (HttpMethod.Delete, url))
+                return await client.SendAsync (req);
     }
 
     protected async Task<string> ContentStringAsync (HttpResponseMessage response) => await response.Content.ReadAsStringAsync ();

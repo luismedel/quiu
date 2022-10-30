@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using quiu.core;
 
@@ -6,6 +7,14 @@ namespace quiu.tests
 {
     public static class Utils
     {
+        public class Comparer<T>
+            : IEqualityComparer<T>
+            where T: IEquatable<T>
+        {
+            public bool Equals (T? x, T? y) => x.Equals (y);
+            public int GetHashCode ([DisallowNull] T obj) => obj.GetHashCode ();
+        }
+
         public static Context InitApp (Config? initialConfig = null, string? pathSuffix = null)
         {
             if (pathSuffix == null)
